@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "tello-drone"
+version = "0.1.0"
+description = "Python code to interface with Tello drone"
+authors = ["michal_niedbala <mniedbala99@gmail.com>"]
+readme = "README.md"
+packages = [{include = "tello_drone", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
