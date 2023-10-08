@@ -5,7 +5,7 @@ import logging
 from queue import Queue
 from collections import namedtuple
 
-
+# TODO - move to separate file 
 state_fields = ["pitch", "roll", "yaw",
                 "vgx", "vgy", "vgz", 
                 "templ", "temph",
@@ -67,32 +67,66 @@ class Tello:
         self.state = ThreadSafeState()
 
         # Start threads
+        self.threads = []
+
+        self.threads.append(threading.Thread(
+            target=self._recv_udp_response, 
+            args=(self.client_sock, self.results)
+        ))
+
+        self.threads.append(threading.Thread(
+            target=self._recv_udp_state, 
+            args=(self.state, )
+        ))
+
+        for thread in self.threads:
+            thread.daemon = True
+            thread.start()
 
         # For client now need to bound
         self.flying = False
         self.stream = False
 
+        # Initialize drone
+        self.initailize_drone()
+
+    def initailize_drone(self):
+        self.send_command("command") 
+
+    def send_command(self, command: str):
+        self.client_sock.sendto(command.encode("utf-8"), self.drone_addr)
+
+    def send_command_response(self, command: str):
+        raise NotImplemented
+
+    @property 
+    def get_state(self):
+        return self.state.get_state()
+
     @staticmethod
-    def _recv_upd_response(client_sock: socket.socket, results: Queue):
+    def _recv_udp_response(client_sock: socket.socket, results: Queue):
         while True:
             try:
                 data, address = client_sock.recvfrom(1024)
-                Queue.put(data.decode("utf-8"))
+                results.put(data.decode("utf-8"))
             except Exception as e:
                 print(e)
                 break
 
     @staticmethod
-    def _recv_upd_state(state: ThreadSafeState):
+    def _recv_udp_state(state: ThreadSafeState):
         # Create state socket
         state_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         state_sock.bind(("", Tello.STATE_PORT))
 
         while True:
             try:
-                data, address = client_sock.recvfrom(1024)
-                state = Tello.parse_state(data.decode("utf-8"))
+                print("wating .. ")
+                data, address = state_sock.recvfrom(1024)
+                print(data)
+                state.set_state(Tello.parse_state(data.decode("utf-8")))
             except Exception as e:
+                # TODO - add exeption
                 print(e)
                 break
 
@@ -115,3 +149,4 @@ class Tello:
 
         state_list = list(map(convert, state.split(";")))
         return State(*state_list)
+
