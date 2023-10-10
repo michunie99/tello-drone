@@ -13,14 +13,13 @@ state_fields = ["pitch", "roll", "yaw",
                 "baro", "time", 
                 "agx", "agy", "agz"]
 
-State = namedtuple("State", state_fields, defaults=(None, ) * len(state_fields))
 
 class ThreadSafeState:
     def __init__(self):
-        self._state = State()
+        self._state = {}
         self._lock = threading.Lock()
 
-    def set_state(self, state: State):
+    def set_state(self, state: dict):
         with self._lock:
             self._state = state
 
@@ -118,12 +117,9 @@ class Tello:
         # Create state socket
         state_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         state_sock.bind(("", Tello.STATE_PORT))
-
         while True:
             try:
-                print("wating .. ")
                 data, address = state_sock.recvfrom(1024)
-                print(data)
                 state.set_state(Tello.parse_state(data.decode("utf-8")))
             except Exception as e:
                 # TODO - add exeption
@@ -134,19 +130,21 @@ class Tello:
         state_sock.close()
 
     @staticmethod
-    def parse_state(state: str) -> State:
-        state = state.rstrip("\r\n")
+    def parse_state(state: str) -> dict:
+        raw_data = state.rstrip(";\r\n")
 
         def convert(data_field):
-            filed_name, value = data_field.split(":")
-
-            if field_name in Tello.INT_STATE_FIELD:
-                return int(value)
-            elif field_name in Tello.FLOAT_STATE_FIELD:
-                return float(value)
+            field_name, value = data_field.split(":")
+            if field_name in Tello.INT_STATE_FIELDS:
+                value = int(value)
+            elif field_name in Tello.FLOAT_STATE_FIELDS:
+                value = float(value)
             else: 
                 raise ValueError
 
-        state_list = list(map(convert, state.split(";")))
-        return State(*state_list)
+            return field_name, value
+
+        state_list = list(map(convert, raw_data.split(";")))
+
+        return dict(state_list)
 
